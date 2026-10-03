@@ -1,0 +1,7 @@
+{
+  "dataset": "dair-ai/emotion, English tweets",
+  "test_size": 2000,
+  "accuracy": 0.923,
+  "macro_f1": null,
+  "per_class": {}
+}

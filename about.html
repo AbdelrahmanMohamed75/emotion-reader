@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>About - Emotion Reader</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/about.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="mark" aria-hidden="true"></span>
+      <span class="brand-name">Emotion Reader</span>
+    </div>
+    <nav class="nav" aria-label="Main">
+      <a href="/">Predictor</a>
+      <a href="/about" aria-current="page">About and accuracy</a>
+    </nav>
+  </header>
+
+  <main class="page">
+    <h1>About this project</h1>
+    <p class="lead">Emotion Reader takes one English sentence and tells you which of six emotions it expresses: sadness, joy, love, anger, fear or surprise. It also shows a score for every emotion, so you can see when the model is unsure.</p>
+
+    <h2>What the project does</h2>
+    <p>Written text carries feeling, but a computer cannot read it the way a person does. This project trains a language model to recognise the emotion in short texts and puts it behind a simple web page. Anyone can type a sentence and get an answer in a second, with no setup.</p>
+    <p>The same idea is used to sort customer feedback, follow the tone of conversations at scale, and study how people express themselves online.</p>
+
+    <h2>How it works</h2>
+    <ol class="steps">
+      <li><div><strong>You type a sentence.</strong> It can be up to 500 characters long.</div></li>
+      <li><div><strong>The text is cleaned.</strong> It is lowercased and apostrophes are removed, exactly like the training data was.</div></li>
+      <li><div><strong>The tokenizer splits it into word pieces.</strong> Each input is cut or padded to 60 tokens.</div></li>
+      <li><div><strong>A fine-tuned DistilBERT model scores the sentence.</strong> DistilBERT is a smaller, faster version of BERT. Here it was trained to pick one of six emotions.</div></li>
+      <li><div><strong>The scores become percentages.</strong> A softmax step turns them into six numbers that add up to 100%, and the page shows them as bars.</div></li>
+    </ol>
+
+    <h2>Why this model</h2>
+    <p>Several models were trained on the same data (the dair-ai/emotion set of English tweets) and scored on the same 2,000 test sentences.</p>
+    <div class="table-wrap">
+      <table class="metrics">
+        <thead><tr><th>Model</th><th>Test accuracy</th></tr></thead>
+        <tbody>
+          <tr><td>SimpleRNN</td><td>34.7%</td></tr>
+          <tr><td>GRU (two layers)</td><td>8.0%</td></tr>
+          <tr><td>LSTM</td><td>88.8%</td></tr>
+          <tr><td>BiGRU</td><td>91.8%</td></tr>
+          <tr><td>BiGRU with GloVe word vectors</td><td>92.7%</td></tr>
+          <tr><td>DistilBERT, fine-tuned</td><td>92.5%</td></tr>
+          <tr><td><strong>DistilBERT, fine-tuned with negation augmentation (used here)</strong></td><td><strong>92.3%</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The best models are within about one percentage point of each other, too small a gap to pick a winner on accuracy alone. What set them apart was negation. Before augmentation, the fine-tuned DistilBERT got only 4 of 64 held-out negation sentences right (6%). After adding about 1,700 generated training sentences, it got 62 of 64 right (97%) while overall accuracy stayed at about 92%. The BiGRU with GloVe was not given this treatment and still read "I am not happy at all right now" as joy.</p>
+    <p class="small">The 64 held-out sentences use words and sentence patterns that were not in the training data, but they are few and generated from templates. They show the fix works for that pattern, not that negation is solved.</p>
+
+    <h2 id="accuracy">Model accuracy</h2>
+    <p>These numbers come from testing the model on sentences it never saw during training.</p>
+    <div id="metrics" aria-live="polite"><p class="notice">Loading results...</p></div>
+    <p class="small"><strong>Accuracy</strong> is the share of sentences labelled correctly. <strong>Precision</strong> tells how often a predicted emotion was right. <strong>Recall</strong> tells how many sentences of an emotion the model found. <strong>F1</strong> combines the two, and <strong>macro F1</strong> averages F1 over all six emotions equally.</p>
+
+    <h2>Problems we ran into</h2>
+    <div class="problem">
+      <h3>Negation</h3>
+      <div>
+        <p>A sentence like "I am not happy at all" contains a happy word but expresses the opposite. Models that lean on single emotion words can get these wrong.</p>
+        <p><strong>What we did:</strong> a test made the problem clear: on 64 held-out negation sentences the model was right only 4 times (6%). We generated about 1,700 extra training sentences from templates and re-trained. It now gets 62 of 64 right (97%), and overall test accuracy did not drop.</p>
+      </div>
+    </div>
+    <div class="problem">
+      <h3>Fixing negation broke other sentences</h3>
+      <div>
+        <p>After the first fix, a sentence like "I can't believe that just happened" was read as joy or sadness, because the model had learned that "can't" and "not" point to sadness.</p>
+        <p><strong>What we did:</strong> we added counter-examples (joy, love and surprise sentences that contain "can't" or "never"), plus sentences such as "I am not afraid anymore", and re-trained from the original model. "I can't believe that just happened" is now read as surprise.</p>
+      </div>
+    </div>
+    <div class="problem">
+      <h3>Models that did not learn</h3>
+      <div>
+        <p>A plain SimpleRNN and a two-layer GRU scored 35% and 8% on the test set, so they failed to learn the task.</p>
+        <p><strong>What we did:</strong> we moved to bidirectional layers with early stopping, then to pretrained GloVe vectors and finally to a pretrained DistilBERT. All of these trained well.</p>
+      </div>
+    </div>
+    <div class="problem">
+      <h3>Apostrophes and contractions</h3>
+      <div>
+        <p>"can't" and "cant" are split into different tokens, so text cleaned differently at training time and at prediction time gives worse results.</p>
+        <p><strong>What we did:</strong> the same cleaning (lowercase, no apostrophes) is applied before training and before every prediction.</p>
+      </div>
+    </div>
+    <div class="problem">
+      <h3>Confidence is not correctness</h3>
+      <div>
+        <p>A model can be 95% sure and still be wrong, especially on sarcasm or mixed feelings.</p>
+        <p><strong>What we did:</strong> the page shows the score of all six emotions, not only the winner, and states that the percentage shows how strongly the model leans, not how likely it is to be right.</p>
+      </div>
+    </div>
+    <div class="problem">
+      <h3>"Internal Server Error" on first run</h3>
+      <div>
+        <p>The model loaded on the first request, and any failure there (a missing library, or a different Python version than the one the packages were installed in) came back as a blank error page.</p>
+        <p><strong>What we did:</strong> errors now return a readable message, and the model loads when the server starts so problems show up immediately.</p>
+      </div>
+    </div>
+    <div class="problem">
+      <h3>Model size and hosting</h3>
+      <div>
+        <p>The trained model file is about 270 MB, and PyTorch needs a fair amount of memory. Many free hosts cannot run it.</p>
+        <p><strong>What we did:</strong> the app runs in a Docker container on a host with enough memory, using the CPU build of PyTorch to keep the image small.</p>
+      </div>
+    </div>
+
+    <h2>Limitations</h2>
+    <p>The model reads English only and looks at one sentence at a time. It chooses from six emotions, so feelings outside that list, mixed emotions, and sarcasm will not always be recognised correctly. Some warm sentences still fail: "I can't believe you remembered, this means everything to me" is read as sadness.</p>
+
+    <p class="back"><a class="go-link" href="/">Try the predictor</a></p>
+  </main>
+  <script src="/static/about.js"></script>
+</body>
+</html>

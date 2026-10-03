@@ -1,0 +1,5 @@
+flask
+torch
+transformers>=4.40
+numpy
+gunicorn
