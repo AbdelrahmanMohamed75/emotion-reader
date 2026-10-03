@@ -1,17 +1,16 @@
 FROM python:3.11-slim
 
-RUN useradd -m -u 1000 user
-USER user
-ENV PATH="/home/user/.local/bin:$PATH" \
-    PRELOAD_MODEL=1 \
+WORKDIR /app
+ENV PRELOAD_MODEL=1 \
     PYTHONUNBUFFERED=1
-WORKDIR /home/user/app
 
-COPY --chown=user requirements.txt .
+COPY requirements.txt .
 RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
  && pip install --no-cache-dir -r requirements.txt
 
-COPY --chown=user . .
+COPY . .
 
-EXPOSE 7860
-CMD ["gunicorn", "main:app", "--bind", "0.0.0.0:7860", "--workers", "1", "--threads", "4", "--timeout", "120"]
+# Download the model once at build time, so the site does not download it on every wake-up
+RUN python -c "from huggingface_hub import snapshot_download; snapshot_download('abdelrahmanemam10/emotion-reader-model', local_dir='Artifacts')"
+
+CMD gunicorn main:app --bind 0.0.0.0:${PORT:-10000} --workers 1 --threads 2 --timeout 180
